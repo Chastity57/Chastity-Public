@@ -1,0 +1,750 @@
+/* ==========================================================================
+   全栈开发1 · 用户登录界面
+   照片背景 / 灰色调 / 磨砂玻璃卡片与按钮 / 自然的按动反馈
+   动效取值来自 animate + apple-design skill：
+   按下反馈 160ms（100–160ms 区间）、视图切换 200ms、只动 transform / opacity
+   ========================================================================== */
+
+:root {
+  /* 动效 token */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);      /* 进场 / 交互反馈 */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);  /* 屏内位移 */
+  --press: 160ms;                                   /* 按下反馈 */
+  --swap: 200ms;                                    /* 视图切换 */
+  --hover: 180ms;
+
+  /* 灰色主题色板 */
+  --g-50:  #f7f8f9;
+  --g-100: #eef0f2;
+  --g-200: #dfe3e7;
+  --g-300: #c7ccd3;
+  --g-400: #9aa1aa;
+  --g-500: #6c737d;
+  --g-600: #474e57;
+  --g-700: #2f343b;
+  --g-800: #21262b;
+  --g-900: #14171a;
+  --ink: var(--g-700);
+  --ink-soft: #333942;              /* 卡片更透之后比背景亮得有限，浅灰要再深一档才够对比度 */
+  --ok: #2f6349;
+  --warn: #7a5a30;
+  --err: #8a3f36;
+
+  /* 磨砂玻璃 token */
+  --glass-fill: rgba(255, 255, 255, 0.24);
+  --glass-fill-hover: rgba(255, 255, 255, 0.36);
+  --glass-fill-press: rgba(255, 255, 255, 0.46);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-blur: blur(18px) saturate(180%);
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 22px -16px rgba(12, 15, 19, 0.7);
+  --glass-shadow-press: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px -9px rgba(12, 15, 19, 0.65);
+
+  /* 登录框比按钮更通透：更低的白色占比 + 更大的模糊半径，靠 blur 换回可读性 */
+  --card-fill: rgba(250, 251, 252, 0.46);
+  --card-blur: blur(38px) saturate(125%);
+
+  /* Liquid Glass 材质 token（Apple-inspired 的网页近似，不是官方组件）
+     参考 apple-liquid-glass-ui skill：半透明填充 + 背景模糊 + 细亮边 + 安静投影，
+     顶边提亮、底边压暗，像光打在材质上；圆角同心（内层比外层小）。 */
+  --lg-radius-xl: 28px;                 /* 浮起的面板（登录卡片） */
+  --lg-radius-2xl: 34px;                /* 模态（问候卡片） */
+  --lg-radius-md: 16px;                 /* 面板内的控件 */
+  --lg-tint: linear-gradient(135deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 46%);
+  --lg-stroke: rgba(255, 255, 255, 0.56);      /* 顶/左亮边 */
+  --lg-stroke-dark: rgba(20, 24, 31, 0.12);    /* 底边压暗，材质才有厚度 */
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  --lg-shadow: 0 34px 70px -30px rgba(8, 10, 13, 0.75), 0 2px 6px -2px rgba(8, 10, 13, 0.3);
+  --lg-fill-solid: rgba(250, 251, 252, 0.78);  /* 无 backdrop-filter / 降低透明度时的回退 */
+  --lg-fill-dialog: rgba(250, 251, 252, 0.5);  /* 模态下面有遮罩，材质可以实一点 */
+
+  /* 背景图定位：检测到人物头部在图片的 x 0.48~0.65、y 0.21~0.38，
+     居中的卡片会正好压住它，所以整张图往左推（--bg-shift-x），
+     同时把可视区域往上偏（--bg-pos-y），保证放大后头顶不被裁掉。
+     注意：|--bg-shift-x| 不能超过 (--bg-zoom - 1) / 2，否则边缘会露白。 */
+  --bg-zoom: 1.5;
+  --bg-shift-x: -24%;
+  --bg-pos-y: 20%;
+
+  --radius-card: 28px;
+  --radius-control: 16px;
+  --radius-chip: 999px;
+}
+
+/* 深色外观：面板本身仍要保持浅色（正文是深灰），所以只把边框/高光/投影调沉一点，
+   填充透明度保持你定的值不变——不跟着系统改成深色玻璃，免得文字对比度掉下来 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lg-stroke: rgba(255, 255, 255, 0.5);
+    --lg-stroke-dark: rgba(10, 12, 16, 0.2);
+    --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    --lg-shadow: 0 34px 74px -30px rgba(4, 6, 9, 0.85), 0 2px 6px -2px rgba(4, 6, 9, 0.4);
+    --lg-fill-solid: rgba(248, 250, 251, 0.86);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { height: 100%; background-color: #191d22; }
+
+body {
+  margin: 0;
+  min-height: 100%;
+  display: grid;
+  align-content: safe center;       /* 窗口够高时垂直居中；窗口太矮时顶部对齐，不裁掉内容 */
+  justify-items: center;            /* 水平居中 */
+  padding: 24px;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* 背景图分两层：底层是照片本身，上层是灰色遮罩，保证灰色主题与文字可读性 */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+body::before {
+  z-index: -2;
+  background: url("background.jpg") center var(--bg-pos-y) / cover no-repeat;
+  filter: grayscale(0.35) brightness(0.94) contrast(1.02);   /* 压成灰色调 */
+  transform: translateX(var(--bg-shift-x)) scale(var(--bg-zoom));   /* 把人物整体推到卡片左边 */
+}
+
+body::after {
+  z-index: -1;
+  background:
+    radial-gradient(120% 90% at 18% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, rgba(26, 30, 36, 0.44) 0%, rgba(15, 18, 22, 0.62) 100%);
+}
+
+/* ------------------------------------------------------------------ 卡片 */
+
+.shell { width: 100%; max-width: 520px; }
+
+.card {
+  position: relative;
+  padding: 28px;
+  border-radius: var(--lg-radius-xl);            /* 圆形倒角（外大） */
+  border: 1px solid var(--lg-stroke);
+  border-bottom-color: var(--lg-stroke-dark);    /* 顶亮底暗，材质才有厚度 */
+  background: var(--lg-tint), var(--card-fill);  /* 一层斜向提亮 + 半透明填充 */
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  box-shadow: var(--lg-shadow), var(--lg-highlight);
+}
+
+.card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.card__titles h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.2rem + 1.1vw, 1.85rem);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.022em;        /* 大字号收紧字距 */
+  color: var(--g-800);
+}
+
+.card__titles p {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  letter-spacing: 0.005em;
+  color: var(--ink-soft);
+}
+
+.conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 0;
+  padding: 6px 11px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.conn__dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--g-400);
+  transition: background-color var(--hover) ease;   /* 只做颜色变化，不做位移 */
+}
+
+.conn[data-state="online"] .conn__dot { background: var(--ok); }
+.conn[data-state="offline"] .conn__dot { background: var(--err); }
+
+/* ------------------------------------------------------- 视图切换（同一格内交叠，无跳动） */
+
+.stage { display: grid; }
+
+.view {
+  grid-area: 1 / 1;                  /* 所有视图叠在同一格，切换时不发生布局跳动 */
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  pointer-events: none;
+  transition:
+    opacity var(--swap) var(--ease-out),
+    transform var(--swap) var(--ease-out),
+    visibility 0s linear var(--swap);
+}
+
+.view.is-active {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--swap) var(--ease-out),
+    transform var(--swap) var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+.hint {
+  margin: 0 0 14px;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  margin: 0 2px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill);
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+/* ------------------------------------------------------------------ 按钮（磨砂玻璃） */
+
+.options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.button {
+  width: 100%;
+  margin: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-control);   /* 圆角 */
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  transition:
+    transform var(--press) var(--ease-out),
+    background-color  var(--hover) ease,
+    border-color      var(--hover) ease,
+    box-shadow        var(--hover) ease,
+    opacity           var(--hover) ease;
+}
+
+/* 按下的瞬间就反馈：先下沉收缩，松开用同一条曲线回弹 */
+.button:active { transform: translateY(1px) scale(0.97); }
+
+/* 键盘可达性 */
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.75), 0 0 0 5px rgba(33, 38, 43, 0.45);
+}
+
+.button[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 选项按钮（1 注册 / 2 登录 / 3 退出） */
+.button--option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  text-align: left;
+  background-color: var(--glass-fill);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.06));
+  box-shadow: var(--glass-shadow);
+}
+
+.button--option:active {
+  background-color: var(--glass-fill-press);
+  box-shadow: var(--glass-shadow-press);
+}
+
+.option__label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--g-800);
+}
+
+.key {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--g-700);
+}
+
+.chev { margin-left: auto; font-size: 1.15rem; color: var(--g-500); }
+
+/* 表单里的主按钮 / 次按钮：同样是磨砂玻璃，只是深浅不同 */
+.button--primary {
+  display: inline-grid;
+  place-items: center;
+  padding: 14px 20px;
+  border-color: rgba(255, 255, 255, 0.32);
+  background-color: rgba(24, 28, 33, 0.5);
+  background-image: linear-gradient(180deg, rgba(46, 52, 59, 0.5), rgba(16, 19, 23, 0.56));
+  color: #fbfbfc;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 12px 26px -18px rgba(0, 0, 0, 0.9);
+}
+
+.button--primary:active {
+  background-color: rgba(18, 21, 25, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 12px -12px rgba(0, 0, 0, 0.9);
+}
+
+.button--ghost {
+  display: inline-grid;
+  place-items: center;
+  padding: 14px 18px;
+  background-color: var(--glass-fill);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.06));
+  color: var(--g-600);
+  font-size: 0.9375rem;
+  font-weight: 550;
+  box-shadow: var(--glass-shadow);
+}
+
+.button--ghost:active {
+  background-color: var(--glass-fill-press);
+  box-shadow: var(--glass-shadow-press);
+}
+
+/* -------------------------------------------------------------- 表单 */
+
+.form { display: grid; gap: 12px; }
+
+.form__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 2px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--g-800);
+}
+
+.field { display: grid; gap: 6px; font-size: 0.8125rem; color: var(--ink-soft); }
+
+.field input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  background-color: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  transition:
+    border-color var(--hover) ease,
+    box-shadow    var(--hover) ease,
+    background-color var(--hover) ease;
+}
+
+.field input::placeholder { color: rgba(46, 52, 59, 0.45); }
+
+.field input:focus-visible,
+.field input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.78);
+  background-color: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 0 3px rgba(33, 38, 43, 0.22);
+}
+
+.form__note {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.form__note b { font-weight: 600; color: var(--g-700); }
+
+.form__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.form__actions .button--primary { flex: 1 1 auto; }
+
+/* ---------------------------------------------------------- 结果提示 */
+
+.result {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  /* 内容面：按 skill「玻璃只给控件和浮层」的原则，这里用安静的浅色面，不做磨砂 */
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.52);
+  transition: border-color var(--hover) ease, background-color var(--hover) ease;
+}
+
+.result__dot {
+  flex: 0 0 auto;
+  width: 8px; height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--g-400);
+  transition: background-color var(--hover) ease;
+}
+
+.result__text { display: grid; gap: 2px; min-width: 0; }
+.result__text strong { font-size: 0.875rem; font-weight: 600; letter-spacing: -0.005em; color: var(--g-800); }
+.result__text small { font-size: 0.75rem; color: var(--ink-soft); }
+
+.result[data-tone="ok"]   { border-color: rgba(47, 99, 73, 0.4);  background: rgba(215, 235, 224, 0.42); }
+.result[data-tone="ok"]   .result__dot { background: var(--ok); }
+.result[data-tone="err"]  { border-color: rgba(138, 63, 54, 0.4); background: rgba(240, 219, 216, 0.42); }
+.result[data-tone="err"]  .result__dot { background: var(--err); }
+.result[data-tone="warn"] { border-color: rgba(122, 90, 48, 0.4); background: rgba(241, 229, 210, 0.42); }
+.result[data-tone="warn"] .result__dot { background: var(--warn); }
+
+/* ------------------------------------------------------ 原始终端输出 */
+
+.console {
+  margin-top: 12px;
+  border-radius: var(--radius-control);
+  /* 同上：终端输出属于内容，不做玻璃，保证等宽字清晰 */
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.42);
+  overflow: hidden;
+}
+
+.console summary {
+  padding: 10px 14px;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.console summary::-webkit-details-marker { display: none; }
+.console summary::before { content: "▸ "; color: var(--g-500); }
+.console[open] summary::before { content: "▾ "; }
+
+.console pre {
+  margin: 0;
+  padding: 0 14px 14px;
+  max-height: 160px;
+  overflow: auto;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  color: var(--g-600);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.42);
+  font-size: 0.6875rem;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+}
+
+.card__foot-tag { color: var(--g-700); }
+
+/* ==================================================================
+   登录成功后的问候卡片
+   时序：卡片淡入 → hello 淡入 → 用户名随后淡入，全部只用透明度
+   字体用页面本身的系统字体（不再使用任何风格字体）
+   ================================================================== */
+
+.greet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 240ms var(--ease-out),
+    visibility 0s linear 240ms;
+}
+
+.greet.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    opacity 240ms var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+/* 调参/重放动画时用：一次性关掉所有过渡，让动画从第一帧干净重来 */
+.greet.no-anim,
+.greet.no-anim * { transition: none !important; }
+
+.greet__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 13, 17, 0.5);
+  backdrop-filter: blur(7px) saturate(120%);
+  -webkit-backdrop-filter: blur(7px) saturate(120%);
+}
+
+.greet__card {
+  position: relative;
+  display: grid;
+  justify-items: center;          /* 内容水平居中 */
+  gap: 6px;
+  padding: 46px 52px 30px;
+  min-width: min(88vw, 420px);
+  border-radius: var(--lg-radius-2xl);                 /* 模态：外圆角比内部控件大 */
+  border: 1px solid var(--lg-stroke);
+  border-bottom-color: var(--lg-stroke-dark);
+  background: var(--lg-tint), var(--lg-fill-dialog);   /* 与登录卡片同一套材质 */
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  box-shadow: var(--lg-shadow), var(--lg-highlight);
+  opacity: 0;
+  transition: opacity 320ms var(--ease-out);
+  transition-delay: 60ms;
+}
+
+.greet.is-open .greet__card {
+  opacity: 1;
+}
+
+/* 文字行：hello + 用户名，整体水平居中，字号字重统一 */
+.greet__line {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  column-gap: 0.2em;              /* 视觉间距；源码里那个空格只给读屏和复制用 */
+  row-gap: 2px;
+  text-align: center;
+  font-size: clamp(1.9rem, 5.4vw, 2.7rem);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--g-800);
+}
+
+/* 两部分都只做透明度变化：
+   hello：2 秒匀速从全透明拉到完全显示；
+   用户名：等 hello 走完再开始，0.5 秒匀速淡入 */
+.greet__hello,
+.greet__name {
+  opacity: 0;
+}
+
+.greet__hello {
+  transition: opacity 2000ms linear;
+  transition-delay: 400ms;                         /* 卡片落位后开始 */
+}
+
+.greet__name {
+  font-weight: 600;
+  color: var(--g-700);
+  transition: opacity 500ms linear;
+  transition-delay: 2400ms;                        /* 400ms + 2000ms：等 hello 走完再开始 */
+}
+
+.greet.is-open .greet__hello,
+.greet.is-open .greet__name {
+  opacity: 1;
+}
+
+.greet__close {
+  margin-top: 16px;
+  padding: 10px 26px;
+  font-size: 0.875rem;
+}
+
+/* ------------------------------------------- 材质回退（不支持 backdrop-filter 时） */
+
+/* 浏览器/设置不支持背景模糊时，玻璃退化成更实的半透明面，先保证读得清 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card,
+  .greet__card { background: var(--lg-tint), var(--lg-fill-solid); }
+  .button { background-color: rgba(255, 255, 255, 0.62); }
+  .button--option { background-image: none; }
+  .button--ghost { background-color: rgba(255, 255, 255, 0.6); }
+  .button--primary { background-color: rgba(24, 28, 33, 0.86); }
+  .conn,
+  kbd { background: rgba(255, 255, 255, 0.5); }
+  .field input { background-color: rgba(255, 255, 255, 0.68); }
+  .greet__scrim { background: rgba(10, 13, 17, 0.72); }
+}
+
+/* 强制颜色模式：交给系统配色，去掉所有材质效果 */
+@media (forced-colors: active) {
+  .card,
+  .greet__card,
+  .button,
+  .conn,
+  kbd,
+  .field input,
+  .result,
+  .console {
+    background: Canvas;
+    border: 1px solid ButtonText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .greet__scrim { background: Canvas; }
+  .greet__hello,
+  .greet__name,
+  .result__text strong,
+  .card__titles h1 { color: CanvasText; }
+  .button--primary { color: ButtonText; }
+}
+
+/* --------------------------------------------------- 指针与悬停门控 */
+
+@media (hover: hover) and (pointer: fine) {
+  .button--option:hover,
+  .button--ghost:hover {
+    transform: translateY(-1px);
+    background-color: var(--glass-fill-hover);
+    border-color: rgba(255, 255, 255, 0.66);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 30px -18px rgba(12, 15, 19, 0.8);
+  }
+
+  .button--primary:hover { background-color: rgba(33, 38, 44, 0.58); }
+  .console summary:hover { color: var(--g-700); }
+}
+
+/* ------------------------------------------------------- 偏好与无障碍 */
+
+/* 降低动态效果：保留透明度与颜色（帮助理解状态），去掉位移与缩放 */
+@media (prefers-reduced-motion: reduce) {
+  .view {
+    transform: none !important;
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 200ms;
+  }
+  .view.is-active {
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 0s;
+  }
+  .button {
+    transition: background-color 200ms ease, border-color 200ms ease, opacity 200ms ease;
+  }
+  .button:active,
+  .button--option:hover,
+  .button--ghost:hover { transform: none; }
+  .button--option:active,
+  .button--ghost:active { background-color: var(--glass-fill-press); }
+  .button--primary:active { background-color: rgba(18, 21, 25, 0.68); }
+
+  /* 问候卡片本来就只是淡入，这里只是把节奏收紧一点 */
+  .greet__hello,
+  .greet__name { transition: opacity 240ms ease; }
+  .greet__hello { transition-delay: 160ms; }
+  .greet__name { transition-delay: 320ms; }
+}
+
+/* 降低透明度：玻璃变实，背景图也压得更暗，保住可读性 */
+@media (prefers-reduced-transparency: reduce) {
+  body::after {
+    background: linear-gradient(180deg, rgba(26, 30, 36, 0.72) 0%, rgba(15, 18, 22, 0.86) 100%);
+  }
+  .card {
+    background: #f4f6f7;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .button,
+  .conn,
+  .field input,
+  .result,
+  .console {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .button--option,
+  .button--ghost { background: var(--g-100); border-color: var(--g-300); }
+  .button--primary { background: var(--g-800); border-color: var(--g-800); }
+  .field input { background: #fff; border-color: var(--g-300); }
+  .console { background: #eceff1; }
+  .greet__scrim { background: rgba(10, 13, 17, 0.86); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .greet__card { background: #f4f6f7; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* 更高对比度 */
+@media (prefers-contrast: more) {
+  body::after {
+    background: linear-gradient(180deg, rgba(20, 23, 27, 0.8) 0%, rgba(10, 12, 15, 0.9) 100%);
+  }
+  .card { background: rgba(255, 255, 255, 0.9); border-color: var(--g-700); }
+  .button--option,
+  .button--ghost,
+  .field input { border-color: var(--g-600); }
+  .option__label,
+  .hint,
+  .form__note,
+  .card__titles p { color: var(--g-800); }
+  .greet__card { background: rgba(255, 255, 255, 0.94); border-color: var(--g-700); }
+  .greet__line { color: #12161a; }
+  .greet__hello { color: #12161a; }
+  .greet__name { color: var(--g-800); }
+}

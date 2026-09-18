@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>用户登录 · 全栈开发1</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<main class="shell">
+  <section class="card" id="card" data-view="menu">
+
+    <header class="card__head">
+      <div class="card__titles">
+        <h1>用户登录</h1>
+        <p>Go 终端后端 · SHA-256 哈希存储 · 网页对接</p>
+      </div>
+      <p class="conn" id="conn" data-state="checking">
+        <span class="conn__dot" aria-hidden="true"></span><span id="connText">正在检测后端…</span>
+      </p>
+    </header>
+
+    <div class="stage">
+
+      <!-- 视图 1：三个选项（对应终端里的 1 注册 / 2 登录 / 3 退出） -->
+      <div class="view is-active" id="view-menu" role="group" aria-label="请选择操作">
+        <p class="hint">请选择要执行的操作，也可以直接按键盘 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></p>
+
+        <ul class="options">
+          <li>
+            <button class="button button--option" type="button" data-go="register">
+              <span class="key" aria-hidden="true">1</span>
+              <strong class="option__label">注册</strong>
+              <span class="chev" aria-hidden="true">›</span>
+            </button>
+          </li>
+          <li>
+            <button class="button button--option" type="button" data-go="login">
+              <span class="key" aria-hidden="true">2</span>
+              <strong class="option__label">登录</strong>
+              <span class="chev" aria-hidden="true">›</span>
+            </button>
+          </li>
+          <li>
+            <button class="button button--option" type="button" data-go="exit">
+              <span class="key" aria-hidden="true">3</span>
+              <strong class="option__label">退出</strong>
+              <span class="chev" aria-hidden="true">›</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- 视图 2：注册表单 -->
+      <div class="view" id="view-register">
+        <form class="form" id="form-register" novalidate>
+          <p class="form__step"><span class="key">1</span>注册新账号</p>
+          <label class="field">
+            <span>用户名</span>
+            <input type="text" name="username" autocomplete="username" maxlength="32" placeholder="例如 alice" required />
+          </label>
+          <label class="field">
+            <span>密码</span>
+            <input type="password" name="password" autocomplete="new-password" maxlength="64" placeholder="仅字母数字，不含空格" required />
+          </label>
+          <p class="form__note">密码由后端 <b>hashpass()</b> 做 SHA-256 哈希后存储，网页不会保存明文。</p>
+          <div class="form__actions">
+            <button class="button button--primary" type="submit">提交注册</button>
+            <button class="button button--ghost" type="button" data-back>返回</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 视图 3：登录表单 -->
+      <div class="view" id="view-login">
+        <form class="form" id="form-login" novalidate>
+          <p class="form__step"><span class="key">2</span>登录已有账号</p>
+          <label class="field">
+            <span>用户名</span>
+            <input type="text" name="username" autocomplete="username" maxlength="32" placeholder="例如 alice" required />
+          </label>
+          <label class="field">
+            <span>密码</span>
+            <input type="password" name="password" autocomplete="current-password" maxlength="64" placeholder="输入注册时的密码" required />
+          </label>
+          <p class="form__note">后端会依次返回「登录成功 / 密码错误 / 用户不存在」。</p>
+          <div class="form__actions">
+            <button class="button button--primary" type="submit">提交登录</button>
+            <button class="button button--ghost" type="button" data-back>返回</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <p class="result" id="result" data-tone="idle" role="status" aria-live="polite">
+      <span class="result__dot" aria-hidden="true"></span>
+      <span class="result__text">
+        <strong id="resultMsg">等待操作</strong>
+        <small id="resultMeta">后端返回的信息会显示在这里</small>
+      </span>
+    </p>
+
+    <details class="console">
+      <summary>后端原始终端输出</summary>
+      <pre id="consoleOut">（暂无输出）</pre>
+    </details>
+
+    <footer class="card__foot">
+      <span>后端 main.go 未被修改，由桥接服务以管道方式运行</span>
+      <span class="card__foot-tag">全栈开发1</span>
+    </footer>
+
+  </section>
+</main>
+
+<!-- 登录成功后的问候卡片：hello 与用户名依次从透明淡入 -->
+<div class="greet" id="greet" role="dialog" aria-modal="true" aria-labelledby="greetLine">
+  <div class="greet__scrim" data-greet-close></div>
+
+  <div class="greet__card">
+    <p class="greet__line" id="greetLine">
+      <span class="greet__hello">hello</span> <span class="greet__name" id="greetName"></span>
+    </p>
+
+    <button class="button button--ghost greet__close" type="button" data-greet-close>关闭</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
